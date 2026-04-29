@@ -189,7 +189,10 @@ class ScreenCapture {
         // 10-bit capture for Main10 encode pipeline — preserves color depth from source
         config.pixelFormat = kCVPixelFormatType_420YpCbCr10BiPlanarFullRange
         config.showsCursor = true
-        config.queueDepth = 4
+        // Phase 2: lower SCStream queue depth from 4 → 3 (Apple's safe minimum).
+        // Saves up to ~7ms of latent buffered frames at 144Hz. Realtime encoder
+        // (~5ms encode, MaxFrameDelayCount=0) keeps up with the smaller buffer.
+        config.queueDepth = 3
         config.capturesAudio = false
         config.backgroundColor = .clear
         config.scalesToFit = false
