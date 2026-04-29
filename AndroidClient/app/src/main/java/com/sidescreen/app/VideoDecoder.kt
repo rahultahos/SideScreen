@@ -1,6 +1,7 @@
 package com.sidescreen.app
 
 import android.media.MediaCodec
+import android.media.MediaCodecInfo
 import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.os.Handler
@@ -217,14 +218,23 @@ class VideoDecoder(
                         !info.name.startsWith("OMX.google.")
                 val supported = videoCaps.isSizeSupported(width, height)
 
+                // Phase 1: prefer Main10-capable decoders for 10-bit HEVC stream.
+                // Snapdragon 8 Elite hardware decoders advertise HEVCProfileMain10 explicitly.
+                val supportsMain10 =
+                    caps.profileLevels.any { pl ->
+                        pl.profile == MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10 ||
+                            pl.profile == MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10HDR10 ||
+                            pl.profile == MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10HDR10Plus
+                    }
+
                 diagLog(
                     "HEVC decoder '${info.name}': " +
                         "width=${videoCaps.supportedWidths}, " +
                         "height=${videoCaps.supportedHeights}, " +
-                        "hw=$isHardware, supports ${width}x$height=$supported",
+                        "hw=$isHardware, main10=$supportsMain10, supports ${width}x$height=$supported",
                 )
 
-                if (supported) {
+                if (supported && supportsMain10) {
                     if (isHardware && hwDecoder == null) {
                         hwDecoder = info.name
                     } else if (!isHardware && swDecoder == null) {

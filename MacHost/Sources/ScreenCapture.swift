@@ -186,7 +186,8 @@ class ScreenCapture {
         config.width = width
         config.height = height
         config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
-        config.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+        // 10-bit capture for Main10 encode pipeline — preserves color depth from source
+        config.pixelFormat = kCVPixelFormatType_420YpCbCr10BiPlanarFullRange
         config.showsCursor = true
         config.queueDepth = 4
         config.capturesAudio = false
@@ -420,7 +421,7 @@ class ScreenCapture {
 
         debugLog("CGDisplayStream fallback — display \(displayID) (\(width)x\(height))")
 
-        let pixelFormat = Int32(kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
+        let pixelFormat = Int32(kCVPixelFormatType_420YpCbCr10BiPlanarFullRange)
         let queue = DispatchQueue(label: "com.sidescreen.cgdisplaystream", qos: .userInteractive)
 
         guard let displayStream = CGDisplayStream(

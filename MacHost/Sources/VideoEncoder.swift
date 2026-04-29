@@ -59,7 +59,16 @@ class VideoEncoder {
 
         // Ultra-low latency config for real-time streaming
         VTSessionSetProperty(session, key: kVTCompressionPropertyKey_RealTime, value: kCFBooleanTrue)
-        VTSessionSetProperty(session, key: kVTCompressionPropertyKey_ProfileLevel, value: kVTProfileLevel_HEVC_Main_AutoLevel)
+        // 10-bit HEVC Main10 — eliminates banding in gradients, preserves shadow detail
+        // Hardware-encoded on Apple Silicon, hardware-decoded on Snapdragon 8 Elite (Pad 3)
+        VTSessionSetProperty(session, key: kVTCompressionPropertyKey_ProfileLevel, value: kVTProfileLevel_HEVC_Main10_AutoLevel)
+
+        // Color metadata so the receiver renders with correct colorimetry.
+        // Mac captures Display P3; closest broadcast-tagged primaries that decoders honor is BT.709 (sRGB-ish)
+        // for SDR or BT.2020 for HDR. Use BT.709 — Pad 3 panel is 8+FRC, not true HDR.
+        VTSessionSetProperty(session, key: kVTCompressionPropertyKey_ColorPrimaries, value: kCMFormatDescriptionColorPrimaries_ITU_R_709_2)
+        VTSessionSetProperty(session, key: kVTCompressionPropertyKey_TransferFunction, value: kCMFormatDescriptionTransferFunction_ITU_R_709_2)
+        VTSessionSetProperty(session, key: kVTCompressionPropertyKey_YCbCrMatrix, value: kCMFormatDescriptionYCbCrMatrix_ITU_R_709_2)
 
         // Dynamic bitrate - remove strict rate limiting for smoother streaming
         // All-intra needs higher bitrate for text sharpness
