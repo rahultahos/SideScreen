@@ -15,7 +15,9 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
+import android.view.Display
 import android.view.MotionEvent
+import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.View
 import android.view.Window
@@ -87,6 +89,10 @@ class MainActivity : AppCompatActivity() {
         // Apply fullscreen mode immediately
         enableFullscreenMode()
 
+        // Phase 2: pin display refresh rate to the highest mode the panel supports
+        // (Pad 3 = 144Hz). Drops vsync floor from 8.33ms (120Hz) to 6.94ms (144Hz).
+        pinHighestRefreshRate()
+
         // Enable performance mode for gaming (after binding is initialized)
         enablePerformanceMode()
 
@@ -97,6 +103,35 @@ class MainActivity : AppCompatActivity() {
         restoreOverlayPosition()
         restoreSettingsButtonPosition()
         startChecklistUpdates()
+    }
+
+    /**
+     * Phase 2: select the Display.Mode with the maximum refresh rate that
+     * matches the current resolution, and request the WindowManager to pin
+     * the panel to it. Lowers vsync deadline from 8.33ms @120Hz → 6.94ms @144Hz
+     * on the OnePlus Pad 3.
+     */
+    private fun pinHighestRefreshRate() {
+        try {
+            val disp: Display? =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display else windowManager.defaultDisplay
+            val modes = disp?.supportedModes ?: return
+            if (modes.isEmpty()) return
+
+            // Pick the mode with the highest refresh rate. Tie-break on largest area.
+            val best =
+                modes.maxWithOrNull(
+                    compareBy({ it.refreshRate }, { it.physicalWidth * it.physicalHeight }),
+                ) ?: return
+
+            val attrs = window.attributes
+            attrs.preferredDisplayModeId = best.modeId
+            window.attributes = attrs
+
+            log("🎯 Pinned display: ${best.physicalWidth}x${best.physicalHeight} @ ${best.refreshRate}Hz (modeId=${best.modeId})")
+        } catch (e: Exception) {
+            log("⚠️ pinHighestRefreshRate failed: ${e.message}")
+        }
     }
 
     /**
@@ -178,6 +213,21 @@ class MainActivity : AppCompatActivity() {
                 override fun surfaceCreated(holder: SurfaceHolder) {
                     mainDiag("surfaceCreated")
                     log("Surface created")
+
+                    // Phase 2: tell the compositor we want fixed-source frames at the
+                    // panel's max rate. Combined with preferredDisplayModeId above,
+                    // this aligns the composition deadline with the encode/decode cadence.
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        try {
+                            val targetHz =
+                                (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display else windowManager.defaultDisplay)
+                                    ?.refreshRate ?: 144f
+                            holder.surface.setFrameRate(targetHz, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
+                            log("🎬 Surface frame rate hinted: ${targetHz}Hz")
+                        } catch (e: Exception) {
+                            log("⚠️ setFrameRate failed: ${e.message}")
+                        }
+                    }
                 }
 
                 override fun surfaceChanged(
