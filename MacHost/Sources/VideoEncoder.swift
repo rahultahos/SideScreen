@@ -14,16 +14,20 @@ class VideoEncoder {
     init(width: Int, height: Int, bitrateMbps: Int = 20, quality: String = "ultralow", gamingBoost: Bool = false, frameRate: Int = 60) {
         self.width = width
         self.height = height
-        self.bitrateMbps = gamingBoost ? 50 : bitrateMbps
-        self.quality = gamingBoost ? "ultralow" : quality
+        // Gaming Boost defaults: pre-Phase-2 these were 50 Mbps + quality 0.3,
+        // which starved 3.4K intra-only HEVC frames and produced visible grain.
+        // 200 Mbps + quality 0.7 stays in realtime budget but eliminates macroblock noise.
+        self.bitrateMbps = gamingBoost ? 200 : bitrateMbps
+        self.quality = gamingBoost ? "low" : quality
         self.gamingBoost = gamingBoost
         self.frameRate = frameRate
         setupCompressionSession()
     }
 
     func updateSettings(bitrateMbps: Int, quality: String, gamingBoost: Bool) {
-        self.bitrateMbps = gamingBoost ? 50 : bitrateMbps
-        self.quality = gamingBoost ? "ultralow" : quality
+        // Same gaming overrides as init — must stay in sync
+        self.bitrateMbps = gamingBoost ? 200 : bitrateMbps
+        self.quality = gamingBoost ? "low" : quality
         self.gamingBoost = gamingBoost
 
         // Drain pending frames before invalidation
@@ -96,7 +100,10 @@ class VideoEncoder {
         // Quality based on preset
         let qualityValue: Float
         if gamingBoost {
-            qualityValue = 0.3  // Ultra low quality for maximum speed
+            // 0.7 — between "low" (0.65) and "medium" (0.8). Eliminates the grain
+            // visible at 0.3 while keeping realtime encode budget. Tested for
+            // smooth+clean tradeoff on Pad 3 at 3.4K 144Hz HEVC Main10 intra-only.
+            qualityValue = 0.7
         } else {
             qualityValue = switch quality {
             case "ultralow": 0.5  // Still fast but better text readability

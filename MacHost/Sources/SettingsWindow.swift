@@ -955,15 +955,19 @@ class DisplaySettings: ObservableObject {
     }
 
     var effectiveBitrate: Int {
+        // Gaming sets a high cap; encoder applies a sane gaming default internally.
         return gamingBoost ? 1000 : bitrate
     }
 
     var effectiveQuality: String {
-        return gamingBoost ? "ultralow" : quality
+        // String is overridden in encoder for gaming; pass-through here is fine.
+        return gamingBoost ? "low" : quality
     }
 
     var effectiveRefreshRate: Int {
-        return gamingBoost ? 120 : refreshRate
+        // Honor the user's refresh choice even in gaming mode — Phase 2 panel
+        // pinning at 144Hz on Pad 3 should not be silently downgraded to 120.
+        return refreshRate
     }
 
     func toggleServer() {
